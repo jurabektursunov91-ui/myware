@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ombor Hisoboti v3.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); padding: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-pdf { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-pdf:hover { background: #c0392b; }
+
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #f1f5f9; color: var(--primary); padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #f1f5f9; }
+
+        #searchInput { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; }
+        .chart-box { height: 300px; display: flex; justify-content: center; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="report-area">
+    <div class="header-flex">
+        <h2>📊 Ombor Hisoboti</h2>
+        <button class="btn-pdf" onclick="downloadPDF()">PDF Yuklash</button>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card">
+            <h3>Zaxira ulushi</h3>
+            <div class="chart-box">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Umumiy holat</h3>
+            <div id="stats-content">Yuklanmoqda...</div>
+            <hr>
+            <p><small>* Ma'lumotlar har 5 daqiqada yangilanadi.</small></p>
+        </div>
+    </div>
+
+    <div class="card">
+        <input type="text" id="searchInput" onkeyup="filterData()" placeholder="Mahsulot qidirish...">
+        <table id="data-table">
+            <thead>
+                <tr>
+                    <th>Mahsulot nomi</th>
+                    <th>Miqdori</th>
+                    <th>Holati</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const SHEET_ID = '1qSJzYCxoLIZy0rmHn-qVl7YCop2hecuTfL0Q_Rt-6vc';
+    const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+    fetch(URL)
+        .then(res => res.text())
+        .then(data => {
+            const json = JSON.parse(data.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\)/)[1]);
+            const rows = json.table.rows;
+
+            let labels = [], counts = [], html = '', total = 0;
+
+            rows.forEach(row => {
+                const name = row.c[0]?.v || '-';
+                const qty = row.c[1]?.v || 0;
+                const status = row.c[3]?.v || 'Mavjud';
+
+                labels.push(name);
+                counts.push(qty);
+                total += qty;
+
+                html += `<tr>
+                    <td><b>${name}</b></td>
+                    <td>${qty} dona</td>
+                    <td style="color: ${qty < 5 ? 'red' : 'green'}">${status}</td>
+                </tr>`;
+            });
+
+            document.getElementById('tableBody').innerHTML = html;
+            document.getElementById('stats-content').innerHTML = `
+                <h1 style="color:var(--accent)">${total}</h1>
+                <p>Ombordagi jami tovarlar soni</p>
+            `;
+
+            // Doiraviy Grafik
+            new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6', '#1abc9c']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        });
+
+    // PDF funksiyasi
+    function downloadPDF() {
+        const element = document.getElementById('report-area');
+        const opt = {
+            margin: 10,
+            filename: 'ombor_hisoboti.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+
+    // Qidiruv
+    function filterData() {
+        let input = document.getElementById("searchInput").value.toUpperCase();
+        let tr = document.getElementById("tableBody").getElementsByTagName("tr");
+        for (let i = 0; i < tr.length; i++) {
+            tr[i].style.display = tr[i].textContent.toUpperCase().includes(input) ? "" : "none";
+        }
+    }
+</script>
+
+</body>
+</html>
